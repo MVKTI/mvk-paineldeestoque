@@ -1,259 +1,252 @@
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { EstoqueService } from '../../../core/services/estoque.service';
 import { Grupo } from '../../../core/models';
 
 @Component({
   selector: 'app-grupos-sidebar',
   template: `
-    <po-widget 
-      p-title="🏷️ Grupos de Produtos" 
-      [p-height]="600"
-      p-primary-label="Grupos Disponíveis">
-      
-      <div class="grupos-container">
-        <div class="filtro-grupos">
-          <po-input 
-            p-placeholder="🔍 Buscar grupo..."
-            [(ngModel)]="filtroTexto"
-            (ngModelChange)="filtrarGrupos()"
-            p-clean="true">
-          </po-input>
-        </div>
-        
-        <div class="grupos-stats">
-          <div class="stat-item">
-            <span class="stat-numero">{{ grupos.length }}</span>
-            <span class="stat-label">Grupos</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-numero">{{ totalProdutos }}</span>
-            <span class="stat-label">Produtos</span>
-          </div>
-        </div>
-        
-        <div class="grupos-lista">
-          <div 
-            *ngFor="let grupo of gruposFiltrados; trackBy: trackByGrupo"
-            class="grupo-card"
-            [class.selected]="grupo.codigo === grupoSelecionado"
-            [class.has-products]="grupo.totalProdutos > 0"
-            (click)="onSelectGrupo(grupo)">
-            
-            <div class="card-header">
-              <div class="grupo-icon">📦</div>
-              <div class="grupo-info">
-                <div class="grupo-nome">{{ grupo.descricao }}</div>
-                <div class="grupo-codigo">{{ grupo.codigo }}</div>
-              </div>
-            </div>
-            
-            <div class="card-footer">
-              <div class="produto-count">
-                <span class="count-numero">{{ grupo.totalProdutos }}</span>
-                <span class="count-label">produtos</span>
-              </div>
-              <div class="status-indicator" 
-                   [class.active]="grupo.ativo">
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="grupos-actions">
-          <po-button
-            p-label="📋 Todos os Grupos"
-            p-kind="primary"
-            p-size="small"
-            [p-disabled]="!grupoSelecionado"
-            (p-click)="selecionarTodos()">
-          </po-button>
+    <div class="grupos-sidebar">
+      <!-- Cabeçalho compacto -->
+      <div class="sidebar-header">
+        <h4>📂 Grupos</h4>
+        <small class="total-produtos">{{ totalProdutos }} produtos</small>
+      </div>
+
+      <!-- Filtro compacto -->
+      <div class="filtro-container">
+        <po-input
+          p-clean
+          p-icon="po-icon-search"
+          p-placeholder="Buscar..."
+          p-size="small"
+          [(ngModel)]="filtroTexto"
+          (p-change)="filtrarGrupos()">
+        </po-input>
+      </div>
+
+      <!-- Botão "Todos" compacto -->
+      <div class="grupo-item todos-grupos"
+           [class.selected]="grupoSelecionado === ''"
+           (click)="selecionarTodos()">
+        <div class="grupo-info">
+          <strong>📋 Todos</strong>
+          <small class="grupo-count">{{ totalProdutos }}</small>
         </div>
       </div>
-    </po-widget>
+
+      <!-- Lista compacta -->
+      <div class="grupos-lista">
+        <div 
+          *ngFor="let grupo of gruposFiltrados; trackBy: trackByGrupo"
+          class="grupo-item"
+          [class.selected]="grupoSelecionado === grupo.codigo"
+          [class.inativo]="!grupo.ativo"
+          (click)="onSelectGrupo(grupo)"
+          (dblclick)="onDoubleClickGrupo(grupo)"
+          [title]="'Duplo clique: ' + grupo.descricao">
+          
+          <div class="grupo-info">
+            <strong>{{ grupo.descricao }}</strong>
+            <div class="grupo-detalhes">
+              <small class="grupo-codigo">{{ grupo.codigo }}</small>
+              <small class="grupo-count">{{ grupo.totalProdutos }}</small>
+            </div>
+          </div>
+          
+          <div class="grupo-status">
+            <span *ngIf="!grupo.ativo" class="status-inativo">⏸️</span>
+            <span *ngIf="grupoSelecionado === grupo.codigo" class="selected-indicator">✓</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Instruções compactas -->
+      <div class="instrucoes">
+        <small>💡 Duplo clique para carregar</small>
+      </div>
+    </div>
   `,
   styles: [`
-    .grupos-container {
-      padding: 16px;
-      height: 100%;
+    .grupos-sidebar {
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      height: calc(100vh - 100px);
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      overflow: hidden;
+      font-size: 13px;
     }
-    
-    .filtro-grupos {
-      margin-bottom: 8px;
-    }
-    
-    .grupos-stats {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-    
-    .stat-item {
-      flex: 1;
-      text-align: center;
+
+    .sidebar-header {
       padding: 12px;
+      border-bottom: 1px solid #e9ecef;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 8px;
       color: white;
+      text-align: center;
     }
-    
-    .stat-numero {
-      display: block;
-      font-size: 1.5rem;
-      font-weight: bold;
+
+    .sidebar-header h4 {
+      margin: 0 0 2px 0;
+      font-size: 14px;
+      font-weight: 600;
     }
-    
-    .stat-label {
-      font-size: 0.8rem;
+
+    .total-produtos {
+      font-size: 11px;
       opacity: 0.9;
     }
-    
+
+    .filtro-container {
+      padding: 8px;
+      border-bottom: 1px solid #e9ecef;
+      background: #f8f9fa;
+    }
+
     .grupos-lista {
       flex: 1;
       overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      padding: 4px 0;
     }
-    
-    .grupo-card {
-      background: white;
-      border-radius: 12px;
-      padding: 16px;
+
+    .grupo-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
       cursor: pointer;
-      transition: all 0.3s ease;
-      border: 2px solid transparent;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      position: relative;
-      overflow: hidden;
+      border-left: 2px solid transparent;
+      transition: all 0.15s ease;
+      user-select: none;
+      min-height: 44px;
     }
-    
-    .grupo-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 4px;
-      height: 100%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-    
-    .grupo-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    }
-    
-    .grupo-card:hover::before {
-      opacity: 1;
-    }
-    
-    .grupo-card.selected {
-      border-color: #667eea;
-      background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
-      transform: translateY(-2px);
-    }
-    
-    .grupo-card.selected::before {
-      opacity: 1;
-    }
-    
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-    
-    .grupo-icon {
-      font-size: 1.5rem;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+
+    .grupo-item:hover {
       background: #f8f9fa;
-      border-radius: 8px;
+      border-left-color: #667eea;
     }
-    
-    .grupo-info {
-      flex: 1;
+
+    .grupo-item.selected {
+      background: #e3f2fd;
+      border-left-color: #2196f3;
     }
-    
-    .grupo-nome {
-      font-weight: 600;
-      color: #2c3e50;
-      font-size: 1rem;
+
+    .grupo-item.todos-grupos {
+      background: #f1f3f4;
+      border-bottom: 1px solid #e9ecef;
       margin-bottom: 2px;
     }
-    
-    .grupo-codigo {
-      font-size: 0.85rem;
-      color: #6c757d;
-      font-family: 'Courier New', monospace;
+
+    .grupo-item.todos-grupos.selected {
+      background: #e8f5e8;
+      border-left-color: #4caf50;
     }
-    
-    .card-footer {
+
+    .grupo-item.inativo {
+      opacity: 0.6;
+    }
+
+    .grupo-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .grupo-info strong {
+      font-size: 12px;
+      color: #2c3e50;
+      line-height: 1.2;
+      font-weight: 500;
+    }
+
+    .grupo-detalhes {
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    
-    .produto-count {
+
+    .grupo-codigo {
+      font-size: 10px;
+      color: #6c757d;
+      font-family: 'Courier New', monospace;
+    }
+
+    .grupo-count {
+      font-size: 10px;
+      color: #28a745;
+      font-weight: 500;
+    }
+
+    .grupo-status {
       display: flex;
-      align-items: baseline;
-      gap: 4px;
+      align-items: center;
+      gap: 2px;
     }
-    
-    .count-numero {
+
+    .status-inativo {
+      font-size: 10px;
+    }
+
+    .selected-indicator {
+      color: #2196f3;
       font-weight: bold;
-      color: #667eea;
-      font-size: 1.1rem;
+      font-size: 12px;
     }
-    
-    .count-label {
-      font-size: 0.8rem;
+
+    .instrucoes {
+      padding: 8px;
+      background: #f8f9fa;
+      border-top: 1px solid #e9ecef;
+      text-align: center;
+    }
+
+    .instrucoes small {
+      font-size: 10px;
       color: #6c757d;
     }
-    
-    .status-indicator {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: #dc3545;
-      transition: background-color 0.3s ease;
-    }
-    
-    .status-indicator.active {
-      background-color: #28a745;
-    }
-    
-    .grupos-actions {
-      text-align: center;
-      padding-top: 16px;
-      border-top: 1px solid #e9ecef;
-    }
-    
-    /* Scrollbar customizada */
+
+    /* Scrollbar fina */
     .grupos-lista::-webkit-scrollbar {
-      width: 6px;
+      width: 4px;
     }
-    
+
     .grupos-lista::-webkit-scrollbar-track {
       background: #f1f1f1;
-      border-radius: 3px;
     }
-    
+
     .grupos-lista::-webkit-scrollbar-thumb {
       background: #c1c1c1;
-      border-radius: 3px;
+      border-radius: 2px;
     }
-    
+
     .grupos-lista::-webkit-scrollbar-thumb:hover {
       background: #a8a8a8;
+    }
+
+    /* Efeito visual compacto */
+    @keyframes pulseSmall {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.01); }
+      100% { transform: scale(1); }
+    }
+
+    .grupo-item:active {
+      animation: pulseSmall 0.1s ease;
+    }
+
+    @media (max-width: 768px) {
+      .grupos-sidebar {
+        font-size: 12px;
+      }
+      
+      .sidebar-header h4 {
+        font-size: 13px;
+      }
+      
+      .grupo-info strong {
+        font-size: 11px;
+      }
     }
   `]
 })
@@ -261,6 +254,7 @@ export class GruposSidebarComponent implements OnInit {
   @Input() tipo: 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO' = 'MATERIA_PRIMA';
   @Input() grupoSelecionado: string = '';
   @Output() grupoChange = new EventEmitter<string>();
+  @Output() produtosRequested = new EventEmitter<string>();
 
   grupos: Grupo[] = [];
   gruposFiltrados: Grupo[] = [];
@@ -272,21 +266,20 @@ export class GruposSidebarComponent implements OnInit {
 
   constructor(private estoqueService: EstoqueService) {}
 
- ngOnInit(): void {
-  // Teste automático da API
-  this.estoqueService.testarConexao().subscribe({
-    next: (response) => {
-      if (response.connected === false) {
-        console.warn('⚠️ API não conectada, usando dados mock');
+  ngOnInit(): void {
+    this.estoqueService.testarConexao().subscribe({
+      next: (response) => {
+        if (response.connected === false) {
+          console.warn('⚠️ API não conectada, usando dados mock');
+        }
+      },
+      error: (error) => {
+        console.warn('⚠️ Teste de API falhou, usando dados mock');
       }
-    },
-    error: (error) => {
-      console.warn('⚠️ Teste de API falhou, usando dados mock');
-    }
-  });
-  
-  this.carregarGrupos();
-}
+    });
+    
+    this.carregarGrupos();
+  }
 
   carregarGrupos(): void {
     this.estoqueService.getGrupos(this.tipo).subscribe({
@@ -313,10 +306,19 @@ export class GruposSidebarComponent implements OnInit {
   }
 
   onSelectGrupo(grupo: Grupo): void {
+    console.log('🖱️ Grupo selecionado:', grupo.codigo);
     this.grupoChange.emit(grupo.codigo);
   }
 
+  onDoubleClickGrupo(grupo: Grupo): void {
+    console.log('🖱️🖱️ Duplo clique no grupo:', grupo.codigo, grupo.descricao);
+    this.grupoChange.emit(grupo.codigo);
+    this.produtosRequested.emit(grupo.codigo);
+    console.log(`📦 Carregando produtos do grupo: ${grupo.descricao}...`);
+  }
+
   selecionarTodos(): void {
+    console.log('🖱️ Selecionando todos os grupos');
     this.grupoChange.emit('');
     this.filtroTexto = '';
     this.filtrarGrupos();

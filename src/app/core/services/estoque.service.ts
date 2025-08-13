@@ -13,6 +13,23 @@ interface ApiResponse<T> {
   total?: number;
 }
 
+// Interface para o novo retorno da API V2 de produtos
+interface ProdutoApiResponse {
+  items: {
+    codigo: string;
+    descricao: string;
+    local: string;
+    estoqueatual: number;
+    entrada: number;
+    empenho: number;
+    disponivel: number;
+    bloq: string;
+    unimedida: string;
+    ultpreco: number;
+    ativo: boolean;
+  }[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -22,15 +39,31 @@ export class EstoqueService {
   private grupoSelecionadoSubject = new BehaviorSubject<string>('');
   grupoSelecionado$ = this.grupoSelecionadoSubject.asObservable();
 
+  // URL específica para a API de produtos
+  private readonly produtosApiUrl = 'http://192.168.0.251:8401/rest/VKPESTLISTAPRDMP';
+
   constructor(private http: HttpClient) {
-    console.log('🔗 EstoqueService inicializado');
+    console.log('🔗 EstoqueService V2 inicializado');
     console.log('📍 API URL:', this.apiUrl);
     console.log('🎯 Endpoints:', this.endpoints);
+    console.log('📦 Produtos API URL:', this.produtosApiUrl);
   }
 
   // HEADERS COM BASIC AUTH CONFIGURADO
   private getHeaders(): HttpHeaders {
     const credentials = btoa(`${environment.auth.username}:${environment.auth.password}`);
+    
+    return new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Basic ${credentials}`,
+      'Cache-Control': 'no-cache'
+    });
+  }
+
+  // HEADERS ESPECÍFICOS PARA API DE PRODUTOS
+  private getProdutosHeaders(): HttpHeaders {
+    const credentials = btoa('admin:msmvk');
     
     return new HttpHeaders({
       'Content-Type': 'application/json',
@@ -64,13 +97,12 @@ export class EstoqueService {
     );
   }
 
-  // BUSCAR GRUPOS (SEU ENDPOINT ESPECÍFICO)
+  // BUSCAR GRUPOS
   getGrupos(tipo: 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO'): Observable<Grupo[]> {
     const url = `${this.apiUrl}/${this.endpoints.grupos}`;
     console.log(`🔍 Buscando grupos: ${tipo}`);
     console.log(`📡 URL completa: ${url}`);
     
-    // Configurar parâmetros se necessário
     let params = new HttpParams();
     params = params.set('tipo', tipo);
     
@@ -83,7 +115,6 @@ export class EstoqueService {
       map(response => {
         console.log('📦 Resposta completa da API:', response);
         
-        // Adaptar diferentes formatos de resposta
         let grupos: any[] = [];
         
         if (response.items) {
@@ -99,7 +130,6 @@ export class EstoqueService {
         
         console.log('📊 Dados dos grupos extraídos:', grupos);
         
-        // Mapear para o formato esperado pelo frontend
         const gruposMapeados = grupos.map(item => {
           const grupo: Grupo = {
             codigo: item.codigo || item.BM_GRUPO || item.grupo_codigo || item.id || '',
@@ -125,13 +155,107 @@ export class EstoqueService {
     );
   }
 
-  // BUSCAR PRODUTOS (PREPARADO PARA PRÓXIMO ENDPOINT)
+  // BUSCAR PRODUTOS DA API V2 - MÉTODO POST
   getProdutos(tipo: 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO', grupo?: string): Observable<Produto[]> {
-    console.log(`🔍 Produtos solicitados: ${tipo}, grupo: ${grupo}`);
-    console.log('ℹ️ Endpoint de produtos ainda não implementado, usando mock');
+    console.log(`🔍 Buscando produtos V2: ${tipo}, grupo: ${grupo}`);
     
-    // Por enquanto usa mock até implementarmos o endpoint de produtos
-    return this.getProdutosMock(tipo, grupo);
+    if (!grupo) {
+      console.log('ℹ️ Nenhum grupo selecionado, retornando lista vazia');
+      return of([]);
+    }
+
+    console.log(`📡 Chamando API V2 de produtos (POST) para grupo: ${grupo}`);
+    console.log(`🌐 URL: ${this.produtosApiUrl}`);
+    
+    const requestBody = {
+      grupo: grupo
+    };
+    
+    console.log('📤 Body JSON enviado:', JSON.stringify(requestBody, null, 2));
+    
+    return this.http.post<ProdutoApiResponse>(this.produtosApiUrl, requestBody, {
+      headers: this.getProdutosHeaders()
+    }).pipe(
+      timeout(15000),
+      retry(2),
+      map(response => {
+        console.log('📦 Resposta da API V2 de produtos:', response);
+        
+        if (!response.items || !Array.isArray(response.items)) {
+          console.warn('⚠️ Resposta da API V2 não contém items válidos:', response);
+          return [];
+        }
+        
+        // Mapear produtos da API V2 para o modelo do frontend
+        const produtosMapeados: Produto[] = response.items.map(item => {
+          // Determinar status baseado nos campos 'ativo' e 'bloq'
+          let status: 'ATIVO' | 'INATIVO' | 'BLOQUEADO' = 'ATIVO';
+          if (!item.ativo) {
+            status = 'INATIVO';
+          } else if (item.bloq === '1' || item.bloq === 'S') {
+            status = 'BLOQUEADO';
+          }
+          
+          const produto: Produto = {
+            codigo: item.codigo,
+            descricao: item.descricao,
+            grupo: grupo,
+            grupoDescricao: '',
+            unidade: item.unimedida,
+            estoqueAtual: item.estoqueatual,  // 🔄 Campo atualizado
+            estoqueMinimo: 0,
+            estoqueMaximo: 0,
+            custoUnitario: item.ultpreco,
+            ultimaCompra: undefined,
+            fornecedor: '',
+            localizacao: item.local,
+            status: status,
+            tipo: tipo,
+            // Novos campos da API V2
+            entrada: item.entrada,           // 🆕 Entradas previstas
+            empenho: item.empenho,          // 🆕 Quantidade empenhada
+            disponivel: item.disponivel,    // 🆕 Estoque disponível real
+            bloqueado: item.bloq === '1' || item.bloq === 'S'
+          };
+          
+          console.log('🔄 Produto V2 mapeado:', {
+            codigo: produto.codigo,
+            estoque: produto.estoqueAtual,
+            entrada: produto.entrada,
+            empenho: produto.empenho,
+            disponivel: produto.disponivel,
+            bloqueado: produto.bloqueado
+          });
+          
+          return produto;
+        });
+        
+        console.log(`✅ ${produtosMapeados.length} produtos V2 mapeados com sucesso`);
+        return produtosMapeados;
+      }),
+      tap(produtos => {
+        console.log(`✅ ${produtos.length} produtos carregados da API V2 via POST`);
+        
+        // Log de resumo dos estoques
+        const totalEstoque = produtos.reduce((sum, p) => sum + p.estoqueAtual, 0);
+        const totalDisponivel = produtos.reduce((sum, p) => sum + p.disponivel, 0);
+        const produtosComEstoqueNegativo = produtos.filter(p => p.disponivel < 0);
+        
+        console.log('📊 Resumo do estoque:', {
+          totalProdutos: produtos.length,
+          estoqueTotal: totalEstoque,
+          disponivelTotal: totalDisponivel,
+          produtosComEstoqueNegativo: produtosComEstoqueNegativo.length
+        });
+      }),
+      catchError(error => {
+        console.error('❌ Erro ao buscar produtos da API V2 (POST):', error);
+        
+        // Em caso de erro, usar dados mock como fallback
+        console.log('🔄 Usando dados mock como fallback para produtos V2');
+        return this.getProdutosMock(tipo, grupo);
+      })
+    );
   }
 
   // PONTO DE PEDIDO (PREPARADO)
@@ -139,7 +263,6 @@ export class EstoqueService {
     console.log('🔍 Pontos de pedido solicitados');
     console.log('ℹ️ Endpoint de pontos de pedido ainda não implementado, usando mock');
     
-    // Por enquanto usa mock
     return this.getPontosPedidoMock();
   }
 
@@ -153,7 +276,6 @@ export class EstoqueService {
       error: error.error
     });
     
-    // Analisar tipo de erro
     if (error.status === 0) {
       console.error('🚫 Erro de rede - verifique se o servidor está online');
     } else if (error.status === 401) {
@@ -164,7 +286,6 @@ export class EstoqueService {
       console.error('⚠️ Erro interno do servidor');
     }
     
-    // Decidir se usa fallback
     if (this.deveUsarFallback(error)) {
       console.log('🔄 Usando dados mock como fallback');
       return this.getFallbackData(endpoint, tipo);
@@ -175,7 +296,6 @@ export class EstoqueService {
   }
 
   private deveUsarFallback(error: HttpErrorResponse): boolean {
-    // Usar fallback para problemas de conectividade
     return error.status === 0 || 
            error.status === 404 || 
            error.status === 500 || 
@@ -185,9 +305,9 @@ export class EstoqueService {
   private getFallbackData(endpoint: string, tipo?: string): Observable<any> {
     switch (endpoint) {
       case 'grupos':
-        return this.getGruposMock(tipo as any);
+        return this.getGruposMock(tipo as 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO');
       case 'produtos':
-        return this.getProdutosMock(tipo as any);
+        return this.getProdutosMock(tipo as 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO');
       case 'pontos-pedido':
         return this.getPontosPedidoMock();
       default:
@@ -195,26 +315,58 @@ export class EstoqueService {
     }
   }
 
-  // DADOS MOCK COMO FALLBACK
+  // DADOS MOCK COMO FALLBACK V2
   private getGruposMock(tipo: 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO'): Observable<Grupo[]> {
     console.log('🎭 Usando dados mock para grupos:', tipo);
     
     const mockGrupos: Grupo[] = [
-      { codigo: '001', descricao: 'Químicos [MOCK]', tipo: 'MATERIA_PRIMA', ativo: true, totalProdutos: 25 },
-      { codigo: '002', descricao: 'Metais [MOCK]', tipo: 'MATERIA_PRIMA', ativo: true, totalProdutos: 18 },
-      { codigo: '003', descricao: 'Plásticos [MOCK]', tipo: 'MATERIA_PRIMA', ativo: true, totalProdutos: 12 },
-      { codigo: '101', descricao: 'Escritório [MOCK]', tipo: 'MATERIAL_CONSUMO', ativo: true, totalProdutos: 45 },
-      { codigo: '102', descricao: 'Limpeza [MOCK]', tipo: 'MATERIAL_CONSUMO', ativo: true, totalProdutos: 32 }
+      { 
+        codigo: '001', 
+        descricao: 'Químicos [MOCK]', 
+        tipo: 'MATERIA_PRIMA' as const,
+        ativo: true, 
+        totalProdutos: 25 
+      },
+      { 
+        codigo: '002', 
+        descricao: 'Metais [MOCK]', 
+        tipo: 'MATERIA_PRIMA' as const,
+        ativo: true, 
+        totalProdutos: 18 
+      },
+      { 
+        codigo: '003', 
+        descricao: 'Plásticos [MOCK]', 
+        tipo: 'MATERIA_PRIMA' as const,
+        ativo: true, 
+        totalProdutos: 12 
+      },
+      { 
+        codigo: '101', 
+        descricao: 'Escritório [MOCK]', 
+        tipo: 'MATERIAL_CONSUMO' as const,
+        ativo: true, 
+        totalProdutos: 45 
+      },
+      { 
+        codigo: '102', 
+        descricao: 'Limpeza [MOCK]', 
+        tipo: 'MATERIAL_CONSUMO' as const,
+        ativo: true, 
+        totalProdutos: 32 
+      }
     ].filter(g => g.tipo === tipo);
 
     return of(mockGrupos);
   }
 
   private getProdutosMock(tipo: 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO', grupo?: string): Observable<Produto[]> {
+    console.log('🎭 Usando dados mock V2 para produtos:', tipo, grupo);
+    
     const mockProdutos: Produto[] = [
       {
         codigo: 'MP001',
-        descricao: 'Ácido Sulfúrico 98% [MOCK]',
+        descricao: 'Ácido Sulfúrico 98% [MOCK V2]',
         grupo: '001',
         grupoDescricao: 'Químicos',
         unidade: 'KG',
@@ -223,13 +375,17 @@ export class EstoqueService {
         estoqueMaximo: 1000,
         custoUnitario: 15.50,
         fornecedor: 'Química Ltda',
-        localizacao: 'A001-001',
+        localizacao: 'A001',
         status: 'ATIVO' as const,
-        tipo: 'MATERIA_PRIMA' as const
+        tipo: 'MATERIA_PRIMA' as const,
+        entrada: 200,      // 🆕 V2
+        empenho: 150,      // 🆕 V2
+        disponivel: 550,   // 🆕 V2
+        bloqueado: false
       },
       {
         codigo: 'MC001',
-        descricao: 'Papel A4 [MOCK]',
+        descricao: 'Papel A4 [MOCK V2]',
         grupo: '101',
         grupoDescricao: 'Escritório',
         unidade: 'PC',
@@ -238,9 +394,13 @@ export class EstoqueService {
         estoqueMaximo: 100,
         custoUnitario: 12.00,
         fornecedor: 'Papelaria Ltda',
-        localizacao: 'C001-001',
+        localizacao: 'C001',
         status: 'ATIVO' as const,
-        tipo: 'MATERIAL_CONSUMO' as const
+        tipo: 'MATERIAL_CONSUMO' as const,
+        entrada: 50,       // 🆕 V2
+        empenho: 30,       // 🆕 V2
+        disponivel: 45,    // 🆕 V2
+        bloqueado: false
       }
     ].filter(p => p.tipo === tipo && (!grupo || p.grupo === grupo));
 

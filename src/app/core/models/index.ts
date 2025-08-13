@@ -13,6 +13,12 @@ export interface Produto {
   localizacao: string;
   status: 'ATIVO' | 'INATIVO' | 'BLOQUEADO';
   tipo: 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO';
+  
+  // Campos da API V2
+  entrada: number;         // entrada - entradas previstas
+  empenho: number;         // empenho - quantidade empenhada  
+  disponivel: number;      // disponivel - estoque disponível real
+  bloqueado: boolean;      // bloq convertido para boolean
 }
 
 export interface Grupo {
