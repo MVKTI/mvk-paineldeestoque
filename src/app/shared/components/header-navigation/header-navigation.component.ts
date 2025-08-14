@@ -1,3 +1,5 @@
+// Atualizar src/app/shared/components/header-navigation/header-navigation.component.ts
+
 import { Component, OnInit } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -40,6 +42,39 @@ import { filter } from 'rxjs/operators';
           <span class="nav-label">Ponto de Pedido</span>
         </button>
 
+        <!-- NOVO: Follow-up Pedidos com Dropdown -->
+        <div class="nav-dropdown" 
+             [class.open]="dropdownOpen" 
+             (clickOutside)="closeDropdown()">
+          <button 
+            class="nav-item dropdown-trigger"
+            [class.active]="currentRoute.includes('/follow-up')"
+            (click)="toggleDropdown()"
+            title="Follow-up de Pedidos">
+            <span class="nav-icon">🚚</span>
+            <span class="nav-label">Follow-up Pedidos</span>
+            <span class="dropdown-arrow" [class.rotated]="dropdownOpen">▼</span>
+          </button>
+
+          <div class="dropdown-menu" *ngIf="dropdownOpen">
+            <button 
+              class="dropdown-item"
+              (click)="navigateTo('/follow-up/pedidos-atrasados')"
+              title="Pedidos Atrasados">
+              <span class="dropdown-icon">⚠️</span>
+              <span class="dropdown-label">Pedidos Atrasados</span>
+            </button>
+            
+            <button 
+              class="dropdown-item"
+              (click)="navigateTo('/follow-up/pedidos-proximos')"
+              title="Pedidos Próximos da Entrega">
+              <span class="dropdown-icon">⏰</span>
+              <span class="dropdown-label">Pedidos Próximos</span>
+            </button>
+          </div>
+        </div>
+
         <button 
           class="nav-item"
           [class.active]="currentRoute === '/relatorios'"
@@ -62,9 +97,7 @@ import { filter } from 'rxjs/operators';
 
         <div class="user-info">
           <span class="user-name">Admin</span>
-          <button class="user-menu" title="Menu do usuário">
-            <span>👤</span>
-          </button>
+          <span class="user-role">Gestor</span>
         </div>
       </div>
     </div>
@@ -74,11 +107,11 @@ import { filter } from 'rxjs/operators';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 16px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
       color: white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 0 20px;
       height: 56px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       position: fixed;
       top: 0;
       left: 0;
@@ -88,45 +121,42 @@ import { filter } from 'rxjs/operators';
 
     .nav-brand h3 {
       margin: 0;
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
       color: white;
-      min-width: 180px;
     }
 
     .nav-menu {
       display: flex;
       align-items: center;
-      gap: 4px;
-      flex: 1;
-      justify-content: center;
+      gap: 8px;
     }
 
     .nav-item {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 16px;
-      background: rgba(255,255,255,0.1);
+      padding: 8px 12px;
+      background: transparent;
       border: none;
+      color: rgba(255, 255, 255, 0.9);
       border-radius: 6px;
-      color: white;
-      font-size: 13px;
-      font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
-      backdrop-filter: blur(10px);
+      font-size: 13px;
+      white-space: nowrap;
     }
 
     .nav-item:hover {
-      background: rgba(255,255,255,0.2);
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
       transform: translateY(-1px);
     }
 
     .nav-item.active {
-      background: rgba(255,255,255,0.25);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      font-weight: 600;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-weight: 500;
     }
 
     .nav-icon {
@@ -134,82 +164,145 @@ import { filter } from 'rxjs/operators';
     }
 
     .nav-label {
-      font-size: 12px;
-      white-space: nowrap;
+      font-size: 13px;
     }
 
-    .nav-actions {
+    /* ESTILOS PARA DROPDOWN */
+    .nav-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-trigger {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dropdown-arrow {
+      font-size: 10px;
+      margin-left: 4px;
+      transition: transform 0.2s ease;
+    }
+
+    .dropdown-arrow.rotated {
+      transform: rotate(180deg);
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+      padding: 8px 0;
+      min-width: 200px;
+      z-index: 1001;
+      margin-top: 8px;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .dropdown-menu::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 20px;
+      width: 12px;
+      height: 12px;
+      background: white;
+      border: 1px solid rgba(0,0,0,0.1);
+      border-bottom: none;
+      border-right: none;
+      transform: rotate(45deg);
+    }
+
+    .dropdown-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      min-width: 180px;
-      justify-content: flex-end;
+      width: 100%;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      color: #2c3e50;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    .dropdown-item:hover {
+      background-color: #f8f9fa;
+    }
+
+    .dropdown-icon {
+      font-size: 14px;
+      width: 16px;
+      text-align: center;
+    }
+
+    .dropdown-label {
+      font-size: 13px;
+    }
+
+    /* Ações do usuário */
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
     .action-btn {
-      padding: 6px;
-      background: rgba(255,255,255,0.1);
+      background: transparent;
       border: none;
-      border-radius: 4px;
-      color: white;
-      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
       cursor: pointer;
+      padding: 6px;
+      border-radius: 4px;
       transition: all 0.2s ease;
-      backdrop-filter: blur(10px);
+      font-size: 16px;
     }
 
     .action-btn:hover {
-      background: rgba(255,255,255,0.2);
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
     }
 
     .user-info {
       display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 4px 8px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 6px;
-      backdrop-filter: blur(10px);
+      flex-direction: column;
+      align-items: flex-end;
+      font-size: 12px;
+      line-height: 1.2;
     }
 
     .user-name {
-      font-size: 12px;
       font-weight: 500;
-    }
-
-    .user-menu {
-      background: none;
-      border: none;
       color: white;
-      font-size: 16px;
-      cursor: pointer;
-      padding: 2px;
-      border-radius: 4px;
-      transition: all 0.2s ease;
     }
 
-    .user-menu:hover {
-      background: rgba(255,255,255,0.2);
+    .user-role {
+      color: rgba(255, 255, 255, 0.7);
     }
 
-    /* Responsive */
+    /* Responsividade */
     @media (max-width: 768px) {
       .header-nav {
-        padding: 6px 12px;
         height: 52px;
+        padding: 0 12px;
       }
 
       .nav-brand h3 {
-        font-size: 14px;
-        min-width: auto;
+        font-size: 16px;
       }
 
       .nav-menu {
-        gap: 2px;
+        gap: 4px;
       }
 
       .nav-item {
-        padding: 6px 12px;
+        padding: 6px 8px;
         font-size: 12px;
       }
 
@@ -221,51 +314,69 @@ import { filter } from 'rxjs/operators';
         font-size: 18px;
       }
 
-      .user-name {
-        display: none;
+      .dropdown-menu {
+        min-width: 180px;
+        right: 0;
+        left: auto;
       }
 
-      .nav-actions {
-        min-width: auto;
-        gap: 4px;
+      .dropdown-menu::before {
+        left: auto;
+        right: 20px;
+      }
+
+      .user-info {
+        display: none;
       }
     }
 
     @media (max-width: 480px) {
-      .nav-item {
-        padding: 4px 8px;
-      }
-
-      .nav-brand h3 {
-        font-size: 12px;
+      .nav-actions {
+        gap: 8px;
       }
 
       .action-btn {
         padding: 4px;
-        font-size: 12px;
       }
     }
   `]
 })
 export class HeaderNavigationComponent implements OnInit {
-  currentRoute: string = '';
+  currentRoute = '';
+  dropdownOpen = false;
 
   constructor(private router: Router) {}
 
   ngOnInit(): void {
-    // Detectar rota atual
-    this.currentRoute = this.router.url;
-    
     // Escutar mudanças de rota
     this.router.events
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event) => {
-        this.currentRoute = (event as NavigationEnd).url;
+        // Cast para NavigationEnd após o filter
+        const navEvent = event as NavigationEnd;
+        this.currentRoute = navEvent.url;
+        this.closeDropdown(); // Fechar dropdown ao navegar
       });
+
+    // Definir rota inicial
+    this.currentRoute = this.router.url;
   }
 
   navigateTo(route: string): void {
-    console.log(`🧭 Navegando para: ${route}`);
     this.router.navigate([route]);
+    this.closeDropdown();
+  }
+
+  toggleDropdown(): void {
+    this.dropdownOpen = !this.dropdownOpen;
+  }
+
+  closeDropdown(): void {
+    this.dropdownOpen = false;
+  }
+
+  // Fechar dropdown ao clicar fora (implementar directive se necessário)
+  onClickOutside(): void {
+    this.closeDropdown();
   }
 }

@@ -42,3 +42,60 @@ export interface PontoPedido {
   ultimoPedido?: Date;
   fornecedor: string;
 }
+
+export interface PedidoAtrasado {
+  codigo: string;
+  fornecedor: string;
+  descricao: string;
+  codigocomprador: string;
+  comprador: string;
+  dataprevista: string; // Formato da API: dd/MM/yyyy
+}
+
+export interface PedidoAtrasadoResponse {
+  items: PedidoAtrasado[];
+}
+
+// Interface processada para uso no componente
+export interface PedidoAtrasadoProcessado extends PedidoAtrasado {
+  dataPreviewFormatada: Date;
+  diasAtraso: number;
+  prioridade: 'CRITICA' | 'ALTA' | 'MEDIA';
+}
+
+export interface PedidoItem {
+  pedido: string;
+  item: string;
+  produto: string;
+  descricao: string;
+  unimedida: string;
+  quantidade: number;
+  preco: number;
+  total: number;
+  observacao: string;
+  emissao: string;
+  previsao: string;
+  condpagamento: string;
+  valoripi: number;
+  valoricm: number;
+  baseicm: number;
+  baseipi: number;
+  despesa: number;
+  frete: number;
+}
+
+export interface PedidoItemResponse {
+  items: PedidoItem[];
+}
+
+// Interface para resumo financeiro do pedido
+export interface PedidoResumo {
+  totalQuantidade: number;
+  totalValor: number;
+  totalIPI: number;
+  totalICM: number;
+  totalDespesa: number;
+  totalFrete: number;
+  valorTotal: number;
+  itensCount: number;
+}

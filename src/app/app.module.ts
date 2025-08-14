@@ -1,42 +1,59 @@
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { RouterModule, Routes } from '@angular/router';
-import { HttpClientModule } from '@angular/common/http';
+// Versão alternativa do src/app/app.module.ts (se houver problemas com imports específicos)
 
-// PO UI
+import { NgModule, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { HttpClientModule } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
+
+// PO UI - Importação geral
 import { PoModule } from '@po-ui/ng-components';
 
-// Componentes da aplicação
+// Routing
+import { AppRoutingModule } from './app-routing.module';
+
+// Components
 import { AppComponent } from './app.component';
 import { HeaderNavigationComponent } from './shared/components/header-navigation/header-navigation.component';
+import { ProdutosListComponent } from './shared/components/produtos-list/produtos-list.component';
+import { PedidoDetalhesModalComponent } from './shared/components/pedido-detalhes-modal/pedido-detalhes-modal.component';
+
+// Pages
 import { MateriaPrimaComponent } from './pages/materia-prima/materia-prima.component';
 import { MaterialConsumoComponent } from './pages/material-consumo/material-consumo.component';
-import { ProdutosListComponent } from './shared/components/produtos-list/produtos-list.component';
+import { PontoPedidoComponent } from './pages/ponto-pedido/ponto-pedido.component';
+import { RelatoriosComponent } from './pages/relatorios/relatorios.component';
+import { PedidosAtrasadosComponent } from './pages/pedidos-atrasados/pedidos-atrasados.component';
+import { PedidosProximosComponent } from './pages/pedidos-proximos/pedidos-proximos.component';
 
-// Rotas
-const routes: Routes = [
-  { path: '', redirectTo: '/materia-prima', pathMatch: 'full' },
-  { path: 'materia-prima', component: MateriaPrimaComponent },
-  { path: 'material-consumo', component: MaterialConsumoComponent },
-  { path: 'ponto-pedido', component: MateriaPrimaComponent }, // Temporário
-  { path: 'relatorios', component: MateriaPrimaComponent }, // Temporário
-];
+// Services
+import { EstoqueService } from './core/services/estoque.service';
+import { PedidosService } from './core/services/pedidos.service';
 
 @NgModule({
   declarations: [
     AppComponent,
     HeaderNavigationComponent,
+    ProdutosListComponent,
+    PedidoDetalhesModalComponent,
     MateriaPrimaComponent,
     MaterialConsumoComponent,
-    ProdutosListComponent
+    PontoPedidoComponent,
+    RelatoriosComponent,
+    PedidosAtrasadosComponent,
+    PedidosProximosComponent
   ],
   imports: [
     BrowserModule,
+    AppRoutingModule,
     HttpClientModule,
-    PoModule,
-    RouterModule.forRoot(routes)
+    FormsModule,
+    PoModule // Importação geral do PO-UI
   ],
-  providers: [],
+  providers: [
+    EstoqueService,
+    PedidosService
+  ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA], // Permite elementos customizados
   bootstrap: [AppComponent]
 })
 export class AppModule { }

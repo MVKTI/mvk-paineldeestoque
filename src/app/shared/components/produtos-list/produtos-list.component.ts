@@ -1,4 +1,4 @@
-import { Component, OnInit, OnChanges, SimpleChanges, Input } from '@angular/core';
+import { Component, OnInit, OnChanges, SimpleChanges, Input, AfterViewInit, OnDestroy } from '@angular/core';
 import { PoTableColumn, PoTableAction } from '@po-ui/ng-components';
 import { EstoqueService } from '../../../core/services/estoque.service';
 import { Produto } from '../../../core/models';
@@ -21,8 +21,8 @@ import { Produto } from '../../../core/models';
         </div>
       </div>
 
-      <!-- Tabela de produtos V2 - com novos campos -->
-      <div *ngIf="!loading && grupoSelecionado" class="table-container">
+      <!-- Tabela de produtos V2 - com novos campos e cores por status -->
+      <div *ngIf="!loading && grupoSelecionado" class="table-container" id="produtos-table-final">
         <po-table
           [p-columns]="columns"
           [p-items]="produtosFiltrados"
@@ -143,18 +143,8 @@ import { Produto } from '../../../core/models';
     }
 
     /* Destaque para estoque disponível negativo */
-    :host ::ng-deep .po-table .po-table-column:nth-child(6) {
+    :host ::ng-deep .po-table .po-table-column:nth-child(7) {
       font-weight: bold;
-    }
-
-    /* Destaque para produtos com disponível negativo */
-    :host ::ng-deep .po-table .po-table-row.estoque-negativo {
-      background-color: #fff3cd !important;
-      border-left: 3px solid #ffc107 !important;
-    }
-
-    :host ::ng-deep .po-table .po-table-row.estoque-negativo:hover {
-      background-color: #fff0b3 !important;
     }
 
     /* Labels menores */
@@ -212,7 +202,7 @@ import { Produto } from '../../../core/models';
     }
   `]
 })
-export class ProdutosListComponent implements OnInit, OnChanges {
+export class ProdutosListComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   @Input() tipo: 'MATERIA_PRIMA' | 'MATERIAL_CONSUMO' = 'MATERIA_PRIMA';
   @Input() grupoSelecionado: string = '';
   @Input() forceReload: number = 0;
@@ -222,6 +212,8 @@ export class ProdutosListComponent implements OnInit, OnChanges {
   produtosFiltrados: Produto[] = [];
   loading = false;
   tableHeight = 500;
+  
+  private colorInterval: number | null = null;
 
   columns: PoTableColumn[] = [
     { 
@@ -314,6 +306,21 @@ export class ProdutosListComponent implements OnInit, OnChanges {
     this.calcularAlturaTabela();
   }
 
+  ngAfterViewInit(): void {
+    // Aguardar a tabela renderizar e então aplicar cores
+    setTimeout(() => {
+      this.applyCorrectColors();
+      this.startPeriodicColorCheck();
+    }, 1000);
+  }
+
+  ngOnDestroy(): void {
+    this.cleanupAll();
+    if (this.colorInterval !== null) {
+      clearInterval(this.colorInterval);
+    }
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['grupoSelecionado'] || changes['forceReload']) {
       this.carregarProdutos();
@@ -322,6 +329,117 @@ export class ProdutosListComponent implements OnInit, OnChanges {
     if (changes['filtroExterno']) {
       this.aplicarFiltroExterno();
     }
+  }
+
+  private cleanupAll(): void {
+    // Remover estilos CSS específicos
+    const styleElement = document.getElementById('produtos-colors-final');
+    if (styleElement) {
+      styleElement.remove();
+    }
+  }
+
+  private startPeriodicColorCheck(): void {
+    // Verificar e corrigir cores a cada 3 segundos
+    this.colorInterval = window.setInterval(() => {
+      this.applyCorrectColors();
+    }, 3000);
+
+    // Parar após 2 minutos
+    setTimeout(() => {
+      if (this.colorInterval !== null) {
+        clearInterval(this.colorInterval);
+        this.colorInterval = null;
+        console.log('🎯 Monitoramento de cores finalizado');
+      }
+    }, 120000);
+  }
+
+  private applyCorrectColors(): void {
+    if (!this.produtosFiltrados || this.produtosFiltrados.length === 0) {
+      return;
+    }
+
+    console.log('🎨 Aplicando cores corretas...');
+    
+    // Primeiro, remover estilos anteriores
+    this.cleanupAll();
+    
+    // Encontrar linhas da tabela
+    const rows = document.querySelectorAll('#produtos-table-final tbody tr');
+    
+    if (rows.length === 0) {
+      console.log('❌ Nenhuma linha encontrada ainda');
+      return;
+    }
+
+    let redCount = 0;
+    let blueCount = 0;
+    let normalCount = 0;
+
+    // Aplicar cores linha por linha
+    rows.forEach((row: Element, index: number) => {
+      if (index < this.produtosFiltrados.length) {
+        const produto = this.produtosFiltrados[index];
+        const htmlRow = row as HTMLElement;
+
+        // LIMPAR TODOS os estilos anteriores
+        htmlRow.style.removeProperty('background-color');
+        htmlRow.style.removeProperty('border-left');
+        htmlRow.style.removeProperty('box-shadow');
+        htmlRow.style.removeProperty('background-image');
+
+        // Limpar células também
+        const cells = htmlRow.querySelectorAll('td');
+        cells.forEach(cell => {
+          (cell as HTMLElement).style.removeProperty('background-color');
+        });
+
+        // Aplicar cor APENAS se atender às condições
+        if (produto.disponivel < 0) {
+          // VERMELHO para disponível negativo
+          htmlRow.style.setProperty('background-color', '#ffebee', 'important');
+          htmlRow.style.setProperty('border-left', '4px solid #f44336', 'important');
+          htmlRow.style.setProperty('background-image', 'linear-gradient(rgba(255, 235, 238, 0.8), rgba(255, 235, 238, 0.8))', 'important');
+          
+          redCount++;
+          console.log(`🔴 Linha ${index + 1}: ${produto.codigo} (Disponível: ${produto.disponivel})`);
+          
+        } else if (produto.status === 'BLOQUEADO') {
+          // AZUL para status bloqueado
+          htmlRow.style.setProperty('background-color', '#e3f2fd', 'important');
+          htmlRow.style.setProperty('border-left', '4px solid #2196f3', 'important');
+          htmlRow.style.setProperty('background-image', 'linear-gradient(rgba(227, 242, 253, 0.8), rgba(227, 242, 253, 0.8))', 'important');
+          
+          blueCount++;
+          console.log(`🔵 Linha ${index + 1}: ${produto.codigo} (Status: ${produto.status})`);
+          
+        } else {
+          // NORMAL - sem cor
+          normalCount++;
+          console.log(`⚪ Linha ${index + 1}: ${produto.codigo} (Normal - Disponível: ${produto.disponivel}, Status: ${produto.status})`);
+        }
+      }
+    });
+
+    console.log(`✅ Cores aplicadas: 🔴${redCount} 🔵${blueCount} ⚪${normalCount} de ${rows.length} linhas`);
+
+    // Parar o monitoramento se aplicou corretamente
+    if (redCount === this.getExpectedRedCount() && blueCount === this.getExpectedBlueCount()) {
+      if (this.colorInterval !== null) {
+        clearInterval(this.colorInterval);
+        this.colorInterval = null;
+        console.log('🎉 Cores aplicadas corretamente! Monitoramento parado.');
+      }
+    }
+  }
+
+  private getExpectedRedCount(): number {
+    return this.produtosFiltrados.filter(p => p.disponivel < 0).length;
+  }
+
+  private getExpectedBlueCount(): number {
+    return this.produtosFiltrados.filter(p => p.status === 'BLOQUEADO').length;
   }
 
   private calcularAlturaTabela(): void {
@@ -341,9 +459,35 @@ export class ProdutosListComponent implements OnInit, OnChanges {
     this.estoqueService.getProdutos(this.tipo, this.grupoSelecionado).subscribe({
       next: (produtos) => {
         console.log(`✅ ${produtos.length} produtos V2 carregados:`, produtos);
+        
+        // Debug das condições de cor
+        let negativeCount = 0;
+        let blockedCount = 0;
+        
+        produtos.forEach((produto, index) => {
+          if (produto.disponivel < 0) {
+            negativeCount++;
+            console.log(`🔴 Produto ${index + 1} com disponível negativo: ${produto.codigo} - ${produto.descricao} (${produto.disponivel})`);
+          }
+          if (produto.status === 'BLOQUEADO') {
+            blockedCount++;
+            console.log(`🔵 Produto ${index + 1} bloqueado: ${produto.codigo} - ${produto.descricao}`);
+          }
+        });
+        
+        console.log(`📊 Resumo esperado: ${negativeCount} vermelhas, ${blockedCount} azuis, ${produtos.length - negativeCount - blockedCount} normais`);
+        
         this.produtos = produtos;
         this.aplicarFiltroExterno();
         this.loading = false;
+        
+        // Aplicar cores após carregar
+        setTimeout(() => {
+          this.applyCorrectColors();
+          if (this.colorInterval === null) {
+            this.startPeriodicColorCheck();
+          }
+        }, 1000);
       },
       error: (error) => {
         console.error('❌ Erro ao carregar produtos V2:', error);
@@ -365,6 +509,11 @@ export class ProdutosListComponent implements OnInit, OnChanges {
         produto.localizacao.toLowerCase().includes(filtro)
       );
     }
+    
+    // Aplicar cores após filtrar
+    setTimeout(() => {
+      this.applyCorrectColors();
+    }, 500);
   }
 
   visualizarProduto(item: Produto): void {
@@ -373,9 +522,9 @@ export class ProdutosListComponent implements OnInit, OnChanges {
       codigo: item.codigo,
       descricao: item.descricao,
       estoque: item.estoqueAtual,
-      entrada: item.entrada,          // 🆕
-      empenho: item.empenho,          // 🆕  
-      disponivel: item.disponivel,    // 🆕
+      entrada: item.entrada,
+      empenho: item.empenho,
+      disponivel: item.disponivel,
       preco: item.custoUnitario,
       local: item.localizacao,
       bloqueado: item.bloqueado,
